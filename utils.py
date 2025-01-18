@@ -23,7 +23,7 @@ label_dict = {
     "left": 4,
     "no": 5,
     "off": 6,
-    "on": 7,
+    "beats": 7,
     "right": 8,
     "stop": 9,
     "up": 10,
@@ -43,7 +43,11 @@ def ScanAudioFiles(root_dir, ver):
         for idx, filename in enumerate(files):
             if not filename.endswith(".wav"):
                 continue
-            dataset, class_name = path.split("/")[-2:]
+            # dataset, class_name = path.split("/")[-2:]
+            # dataset, class_name = os.path.split(os.path.dirname(path))
+            parent, class_name = os.path.split(path)
+            dataset = os.path.basename(parent)
+
             if class_name in ("_unknown_", "_silence_"):  # balancing
                 if "train" in dataset and idx == sample_per_cls[0]:
                     break
@@ -277,7 +281,8 @@ def split_data(base, target, valid_list, test_list):
             if "_background_noise_" in os.path.join(root, file_name):
                 continue
 
-            class_name = root.split("/")[-1]
+            # class_name = root.split("/")[-1]
+            class_name = os.path.basename(root)
             for item in trg_base_dirs:
                 if not os.path.isdir(os.path.join(item, class_name)):
                     os.mkdir(os.path.join(item, class_name))

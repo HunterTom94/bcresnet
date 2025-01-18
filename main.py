@@ -29,7 +29,7 @@ class Trainer:
             "--ver", default=1, help="google speech command set version 1 or 2", type=int
         )
         parser.add_argument(
-            "--tau", default=1, help="model size", type=float, choices=[1, 1.5, 2, 3, 6, 8]
+            "--tau", default=8, help="model size", type=float, choices=[1, 1.5, 2, 3, 6, 8]
         )
         parser.add_argument("--gpu", default=0, help="gpu device id", type=int)
         parser.add_argument("--download", help="download data", action="store_true")
@@ -132,11 +132,13 @@ class Trainer:
         base_dir = "./data/speech_commands_v0.01"
         url = "https://storage.googleapis.com/download.tensorflow.org/data/speech_commands_v0.01.tar.gz"
         url_test = "https://storage.googleapis.com/download.tensorflow.org/data/speech_commands_test_set_v0.01.tar.gz"
+        self.ver = 2
         if self.ver == 2:
             base_dir = base_dir.replace("v0.01", "v0.02")
             url = url.replace("v0.01", "v0.02")
             url_test = url_test.replace("v0.01", "v0.02")
         test_dir = base_dir.replace("commands", "commands_test_set")
+        # self.download = True
         if self.download:
             old_dirs = glob(base_dir.replace("commands_", "commands_*"))
             for old_dir in old_dirs:
@@ -145,8 +147,11 @@ class Trainer:
             DownloadDataset(test_dir, url_test)
             os.mkdir(base_dir)
             DownloadDataset(base_dir, url)
+            exit(0)
             SplitDataset(base_dir)
             print("Done...")
+
+
 
         # Define data loaders
         train_dir = "%s/train_12class" % base_dir
