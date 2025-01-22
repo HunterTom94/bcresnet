@@ -9,11 +9,16 @@ from torch.utils.data import DataLoader
 from argparse import ArgumentParser
 from tqdm import tqdm
 
+# -------------------------
+# Added import for TensorBoard
+# -------------------------
+from torch.utils.tensorboard import SummaryWriter
+
 # Import your BCResNet model (unchanged)
 from bcresnet import BCResNets
 
 # Import your custom dataset utilities (modified below)
-from utils import TwoClassDataset, Padding, Preprocess
+from utils_2_classes import TwoClassDataset, Padding, Preprocess
 
 class Trainer:
     def __init__(self):
@@ -23,7 +28,7 @@ class Trainer:
         parser = ArgumentParser()
         parser.add_argument(
             "--data_dir",
-            default="./data",
+            default="G:\\CodeRepo\\k-sound-data\\prepared_all",
             help="Path to the root data directory (with train/valid/test)",
             type=str,
         )
@@ -31,7 +36,7 @@ class Trainer:
             "--batch_size", default=64, help="Batch size", type=int
         )
         parser.add_argument(
-            "--tau", default=1.0, help="Model size factor for BCResNet", type=float
+            "--tau", default=8, help="Model size factor for BCResNet", type=float
         )
         parser.add_argument("--gpu", default=0, help="GPU device ID", type=int)
         args = parser.parse_args()
@@ -43,6 +48,11 @@ class Trainer:
         self.device = torch.device(
             f"cuda:{self.gpu}" if torch.cuda.is_available() else "cpu"
         )
+
+        # -------------------------
+        # Initialize TensorBoard writer
+        # -------------------------
+        self.writer = SummaryWriter()
 
         # Load data and model
         self._load_data()
@@ -64,19 +74,23 @@ class Trainer:
         # Some basic transform: zero-pad to 1 second
         transform = Padding()
 
-        # Create Dataset objects
         train_dataset = TwoClassDataset(
             os.path.join(self.data_dir, "train"),
             transform=transform
         )
+        print(f"Train folder path: {os.path.join(self.data_dir, 'train')}")
+
         valid_dataset = TwoClassDataset(
-            os.path.join(self.data_dir, "valid"),
+            os.path.join(self.data_dir, "val"),
             transform=transform
         )
+        print(f"Validation dataset length: {len(valid_dataset)}")  # Debug print
+
         test_dataset = TwoClassDataset(
             os.path.join(self.data_dir, "test"),
             transform=transform
         )
+        print(f"Test dataset length: {len(test_dataset)}")  # Debug print
 
         self.train_loader = DataLoader(
             train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=0
@@ -106,7 +120,6 @@ class Trainer:
         freq_mask_val = frequency_masking_para.get(self.tau, 0)
 
         # Create Preprocess objects for train/test
-        # noise_dir can be None if you don’t have background noise
         self.preprocess_train = Preprocess(
             noise_loc=None,  # or point to your noise folder
             device=self.device,
@@ -116,7 +129,7 @@ class Trainer:
         self.preprocess_test = Preprocess(
             noise_loc=None,
             device=self.device,
-            specaug=False, # no spec-augment for valid/test
+            specaug=False,  # no spec-augment for valid/test
         )
 
     def _load_model(self):
@@ -150,7 +163,10 @@ class Trainer:
 
         for epoch in range(total_epoch):
             self.model.train()
-            for sample in tqdm(self.train_loader, desc=f"Epoch {epoch+1}"):
+            running_loss = 0.0
+            num_samples = 0
+
+            for sample in tqdm(self.train_loader, desc=f"Epoch {epoch+1}/{total_epoch}"):
                 iterations += 1
 
                 # Cosine LR schedule with warmup
@@ -182,18 +198,36 @@ class Trainer:
                 loss.backward()
                 optimizer.step()
 
-            # Check valid set after each epoch
-            print(f"--- Current LR: {lr:.5f} ---")
+                running_loss += loss.item() * inputs.size(0)
+                num_samples += inputs.size(0)
+
+            # Compute average epoch loss
+            epoch_loss = running_loss / num_samples
+
+            # -------------
+            # Log to TensorBoard
+            # -------------
+            self.writer.add_scalar("Train/EpochLoss", epoch_loss, epoch)
+            self.writer.add_scalar("Train/LearningRate", lr, epoch)
+
+            # Validation step
             valid_acc = self.evaluate(self.valid_loader, augment=False)
-            print(f"Validation Acc = {valid_acc:.2f}")
+            self.writer.add_scalar("Validation/Accuracy", valid_acc, epoch)
+            print(f"[Epoch {epoch+1:2d}] LR: {lr:.5f} | "
+                  f"Train Loss: {epoch_loss:.4f} | Valid Acc: {valid_acc:.2f}")
 
         # Final test set
         test_acc = self.evaluate(self.test_loader, augment=False)
+        self.writer.add_scalar("Test/Accuracy", test_acc, total_epoch)
         print(f"Final Test Acc = {test_acc:.2f}")
 
         torch.save(self.model.state_dict(), self.save_path)
         print(f"Model saved to: {self.save_path}")
-        
+
+        # -------------
+        # Close the TensorBoard writer
+        # -------------
+        self.writer.close()
         print("End of Training.")
 
     def evaluate(self, loader, augment=False):

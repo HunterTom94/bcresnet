@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from bcresnet import BCResNets
-from utils import Padding, Preprocess
+from utils_2_classes import Padding, Preprocess
 
 
 class AudioInference:
@@ -33,7 +33,7 @@ class AudioInference:
             self.device = torch.device(device)
 
         # 2) Load model
-        self.model = BCResNets(int(tau * 8)).to(self.device)
+        self.model = BCResNets(int(tau * 8), num_classes=2).to(self.device)
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.eval()
 
@@ -53,8 +53,7 @@ class AudioInference:
 
         # 6) Mapping from class index to label name (as used in your training)
         self.index_to_label = [
-            "yes", "no", "up", "down", "left", "right",
-            "on", "off", "stop", "go", "unknown", "silence"
+            "beat", "non-beat"
         ]
 
     def infer_window(self, chunk_waveform):
@@ -173,10 +172,10 @@ class AudioInference:
         # Overlay windows with predicted_idx == 7
         # We'll color them red with some transparency (alpha)
         for (st, ed, pidx, plabel) in predicted_windows:
-            if pidx == 7:  # "off"
+            if pidx == 0:
                 plt.axvspan(st, ed, color="red", alpha=0.3)
 
-        plt.title(f"Sliding-Window Prediction (Highlight = label index 7)")
+        plt.title(f"Sliding-Window Prediction (Highlight = beat")
         plt.xlabel("Time (seconds)")
         plt.ylabel("Amplitude")
         plt.legend(loc="upper right")
@@ -188,8 +187,8 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     # Example usage
     # --------------------------------------------------------------------------
-    model_path = "./model.pth"  # Path to your trained BCResNet model
-    wav_path = "E:\\CodeRepos\\QuietCuff\\output\\audio_output_20240612_102952_873785_11.wav"
+    model_path = "./model_2_classes.pth"
+    wav_path = "G:\\CodeRepo\\k-sound-data\\track_label\\audio_output_6.wav"
 
     # Create the inference object
     inference_engine = AudioInference(model_path=model_path, tau=8)
@@ -197,6 +196,6 @@ if __name__ == "__main__":
     # Run inference with a 500ms window, 250ms step
     inference_engine(
         wav_path=wav_path,
-        window_ms=500,
-        step_ms=250
+        window_ms=200,
+        step_ms=50
     )

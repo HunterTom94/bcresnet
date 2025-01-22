@@ -28,22 +28,33 @@ class TwoClassDataset(Dataset):
          heartbeat/
          non_heartbeat/
     """
+
     def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
         self.transform = transform
         self.data_list = []
         self.labels = []
 
+        print(f"[DEBUG] Using root_dir = {root_dir}")
+        print(f"[DEBUG] label_dict = {label_dict}")
+
         for class_name in label_dict.keys():
             folder = os.path.join(root_dir, class_name)
+            print(f"[DEBUG] Inspecting folder: {folder}")
+
             if not os.path.isdir(folder):
-                # skip if the sub-folder does not exist
+                print(f"[DEBUG] Folder does not exist (skipping): {folder}")
                 continue
+
             # gather .wav files
             wav_paths = glob(os.path.join(folder, "*.wav"))
+            print(f"[DEBUG] Found {len(wav_paths)} .wav files in {folder}")
+
             for wpath in wav_paths:
                 self.data_list.append(wpath)
                 self.labels.append(label_dict[class_name])
+
+        print(f"[DEBUG] Total samples in dataset: {len(self.data_list)}")
 
     def __len__(self):
         return len(self.labels)
