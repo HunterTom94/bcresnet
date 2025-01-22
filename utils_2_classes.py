@@ -118,24 +118,51 @@ class LogMel:
         return (mel_out + 1e-6).log()
 
 
+# class Padding:
+#     """
+#     Zero-pad (or fail) so that each sample is 1s of audio at 16kHz
+#     """
+#     def __init__(self, target_len=SR):
+#         self.target_len = target_len
+#
+#     def __call__(self, x):
+#         # x: shape [1, T]
+#         pad_len = self.target_len - x.shape[-1]
+#         if pad_len > 0:
+#             # zero-pad to the right
+#             x = torch.cat([x, torch.zeros([1, pad_len])], dim=-1)
+#         elif pad_len < 0:
+#             # or slice if longer
+#             x = x[:, : self.target_len]
+#         return x
+
 class Padding:
-    """
-    Zero-pad (or fail) so that each sample is 1s of audio at 16kHz
-    """
-    def __init__(self, target_len=SR):
-        self.target_len = target_len
+    """Zero-pad to have 1 second length (SR = 16000)."""
+
+    def __init__(self):
+        self.output_len = SR  # e.g., 16000
 
     def __call__(self, x):
-        # x: shape [1, T]
-        pad_len = self.target_len - x.shape[-1]
+        """
+        x may have shape:
+         - (B, T)   -> old style
+         - (B, 1, T) -> new style
+        We'll pad along the last dimension in either case.
+        """
+        pad_len = self.output_len - x.shape[-1]
         if pad_len > 0:
-            # zero-pad to the right
-            x = torch.cat([x, torch.zeros([1, pad_len])], dim=-1)
+            # Create a zeros tensor matching x in all dims except the last
+            pad_shape = list(x.shape)
+            pad_shape[-1] = pad_len  # only adjust time dimension
+            zeros = torch.zeros(
+                pad_shape,
+                device=x.device,
+                dtype=x.dtype
+            )
+            x = torch.cat([x, zeros], dim=-1)
         elif pad_len < 0:
-            # or slice if longer
-            x = x[:, : self.target_len]
+            raise ValueError("No sample should exceed 1 second in GSC.")
         return x
-
 
 class Preprocess:
     """
