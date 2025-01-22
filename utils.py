@@ -199,19 +199,48 @@ class LogMel:
         return output
 
 
+# class Padding:
+#     """zero pad to have 1 sec len"""
+#
+#     def __init__(self):
+#         self.output_len = SR
+#
+#     def __call__(self, x):
+#         pad_len = self.output_len - x.shape[-1]
+#         if pad_len > 0:
+#             x = torch.cat([x, torch.zeros([x.shape[0], pad_len])], dim=-1)
+#         elif pad_len < 0:
+#             raise ValueError("no sample exceed 1sec in GSC.")
+#         return x
+#
 class Padding:
-    """zero pad to have 1 sec len"""
+    """Zero-pad to have 1 second length (SR = 16000)."""
 
     def __init__(self):
-        self.output_len = SR
+        self.output_len = SR  # e.g., 16000
 
     def __call__(self, x):
+        """
+        x may have shape:
+         - (B, T)   -> old style
+         - (B, 1, T) -> new style
+        We'll pad along the last dimension in either case.
+        """
         pad_len = self.output_len - x.shape[-1]
         if pad_len > 0:
-            x = torch.cat([x, torch.zeros([x.shape[0], pad_len])], dim=-1)
+            # Create a zeros tensor matching x in all dims except the last
+            pad_shape = list(x.shape)
+            pad_shape[-1] = pad_len  # only adjust time dimension
+            zeros = torch.zeros(
+                pad_shape,
+                device=x.device,
+                dtype=x.dtype
+            )
+            x = torch.cat([x, zeros], dim=-1)
         elif pad_len < 0:
-            raise ValueError("no sample exceed 1sec in GSC.")
+            raise ValueError("No sample should exceed 1 second in GSC.")
         return x
+
 
 def DownloadDataset(loc, url):
     if not os.path.isdir(loc):
