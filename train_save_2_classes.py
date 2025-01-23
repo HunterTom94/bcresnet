@@ -145,7 +145,7 @@ class Trainer:
         """
         Main training loop
         """
-        total_epoch = 20
+        total_epoch = 200
         warmup_epoch = 2
         init_lr = 0.01
         lr_lower_limit = 0
